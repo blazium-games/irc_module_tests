@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="irc_module_tests"
+config/name="IRC Module Tests"
 config/features=PackedStringArray("4.3.2", "GL Compatibility")
 config/icon="res://icon.svg"
 
