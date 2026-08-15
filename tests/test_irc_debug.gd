@@ -1,7 +1,10 @@
-extends GutTest
+extends AutoworkTest
 
 func test_001_debug_disabled():
-	gut.p("Spawning isolated headless engine process to execute connection sequence with DEBUG = FALSE")
+	if OS.get_environment("IRC_LIVE_TESTS") != "1":
+		pending("Requires live libera.chat (set IRC_LIVE_TESTS=1)")
+		return
+	print_log("Spawning isolated headless engine process to execute connection sequence with DEBUG = FALSE")
 	var output = []
 	var exe_path = OS.get_executable_path()
 	
@@ -27,7 +30,10 @@ func _init():
 		assert_false(output[0].contains("IRC SEND:"), "Output must remain fully devoid of ANY raw IRC payload string outputs when debug is strictly false natively")
 
 func test_002_debug_enabled():
-	gut.p("Spawning isolated headless engine process to execute connection sequence with DEBUG = TRUE")
+	if OS.get_environment("IRC_LIVE_TESTS") != "1":
+		pending("Requires live libera.chat (set IRC_LIVE_TESTS=1)")
+		return
+	print_log("Spawning isolated headless engine process to execute connection sequence with DEBUG = TRUE")
 	var output = []
 	var exe_path = OS.get_executable_path()
 	

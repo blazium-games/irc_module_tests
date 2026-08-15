@@ -1,12 +1,21 @@
-extends GutTest
+extends AutoworkTest
 
 var irc1: IRCClientNode
 var irc2: IRCClientNode
+var live_ok := false
 var test_channel = "#blz_multi_" + str(randi() % 1000)
 var nick1 = "bz_test_a_" + str(randi() % 1000)
 var nick2 = "bz_test_b_" + str(randi() % 1000)
 
-func before_all():
+func _require_live() -> bool:
+	if live_ok:
+		return true
+	pending("Requires live libera.chat (set IRC_LIVE_TESTS=1)")
+	return false
+
+func _before_all():
+	if OS.get_environment("IRC_LIVE_TESTS") != "1":
+		return
 	irc1 = IRCClientNode.new()
 	irc2 = IRCClientNode.new()
 	
@@ -20,11 +29,11 @@ func before_all():
 	watch_signals(irc1.get_client())
 	watch_signals(irc2.get_client())
 
-	gut.p("Connecting Client 1 to irc.libera.chat...")
+	print_log("Connecting Client 1 to irc.libera.chat...")
 	var err1 = irc1.connect_to_server("irc.libera.chat", 6697, true, nick1, "blazebot1", "Blazium Test Bot 1")
 	assert_eq(err1, OK, "Client 1 should initiate connection without error")
 
-	gut.p("Connecting Client 2 to irc.libera.chat...")
+	print_log("Connecting Client 2 to irc.libera.chat...")
 	var err2 = irc2.connect_to_server("irc.libera.chat", 6697, true, nick2, "blazebot2", "Blazium Test Bot 2")
 	assert_eq(err2, OK, "Client 2 should initiate connection without error")
 	
@@ -32,8 +41,9 @@ func before_all():
 		if irc1.is_irc_connected() and irc2.is_irc_connected():
 			break
 		await get_tree().create_timer(0.1).timeout
+	live_ok = irc1.is_irc_connected() and irc2.is_irc_connected()
 
-func after_all():
+func _after_all():
 	if irc1 and is_instance_valid(irc1):
 		if irc1.is_irc_connected():
 			irc1.disconnect_from_server("Testing completed 1")
@@ -45,11 +55,15 @@ func after_all():
 		irc2.queue_free()
 
 func test_001_connection_established():
+	if not _require_live():
+		return
 	assert_true(irc1.is_irc_connected(), "Client 1 should completely connect and authenticate to the host")
 	assert_true(irc2.is_irc_connected(), "Client 2 should completely connect and authenticate to the host")
 
 func test_002_channel_join():
-	gut.p("Clients actively connecting against channel " + test_channel)
+	if not _require_live():
+		return
+	print_log("Clients actively connecting against channel " + test_channel)
 	var joined_state = { "irc1": false, "irc2": false }
 	irc1.get_client().joined.connect(func(channel): if channel == test_channel: joined_state.irc1 = true)
 	irc2.get_client().joined.connect(func(channel): if channel == test_channel: joined_state.irc2 = true)
@@ -75,7 +89,9 @@ func test_002_channel_join():
 	await get_tree().create_timer(3.0).timeout
 
 func test_003_channel_broadcast():
-	gut.p("Client 1 broadcasting standard payload to channel")
+	if not _require_live():
+		return
+	print_log("Client 1 broadcasting standard payload to channel")
 	var channel_msg = "Hello Client 2, confirming network routing structure."
 	irc1.send_privmsg(test_channel, channel_msg)
 	
@@ -88,7 +104,9 @@ func test_003_channel_broadcast():
 		assert_eq(ping1_args[2], channel_msg, "Message payload matches 1:1 explicitly")
 
 func test_004_direct_message():
-	gut.p("Client 2 transmitting private message standard payload directly to Client 1")
+	if not _require_live():
+		return
+	print_log("Client 2 transmitting private message standard payload directly to Client 1")
 	var dm_msg = "I copy you perfectly loud and clear Client 1!"
 	irc2.send_privmsg(nick1, dm_msg)
 	
@@ -101,7 +119,9 @@ func test_004_direct_message():
 		assert_eq(ping2_args[2], dm_msg, "Message payload matches exact DM string variant")
 
 func test_005_ctcp_action():
-	gut.p("Client 1 executing CTCP action wrapper ping")
+	if not _require_live():
+		return
+	print_log("Client 1 executing CTCP action wrapper ping")
 	var action_msg = "waves securely to the entire channel!"
 	irc1.send_action(test_channel, action_msg)
 	
@@ -113,7 +133,9 @@ func test_005_ctcp_action():
 		assert_true(action_args[2].contains(action_msg), "Should reliably contain the CTCP action message parameters")
 
 func test_006_send_notice():
-	gut.p("Client 1 transmitting notice securely to Client 2")
+	if not _require_live():
+		return
+	print_log("Client 1 transmitting notice securely to Client 2")
 	var dm_msg = "This is a strictly non-automated notice."
 	irc1.send_notice(nick2, dm_msg)
 	
@@ -126,7 +148,9 @@ func test_006_send_notice():
 		assert_eq(args[2], dm_msg, "Message payload matches")
 
 func test_007_set_topic():
-	gut.p("Client 1 modifying the general room topic")
+	if not _require_live():
+		return
+	print_log("Client 1 modifying the general room topic")
 	var new_topic = "Blazium Automated Headless Testing Room"
 	irc1.set_topic(test_channel, new_topic)
 	
@@ -138,7 +162,9 @@ func test_007_set_topic():
 		assert_eq(args[1], new_topic, "New topic string matches exactly")
 
 func test_008_set_mode():
-	gut.p("Client 1 modifying Client 2's specific channel mode (+v)")
+	if not _require_live():
+		return
+	print_log("Client 1 modifying Client 2's specific channel mode (+v)")
 	# irc1 has operator status because they joined first to an empty channel!
 	irc1.get_client().voice_user(test_channel, nick2)
 	
@@ -151,7 +177,9 @@ func test_008_set_mode():
 		assert_true(args[2].has(nick2), "Mode targets Client 2 exclusively")
 
 func test_009_set_nick():
-	gut.p("Client 1 executes local identity change")
+	if not _require_live():
+		return
+	print_log("Client 1 executes local identity change")
 	var new_nick1 = "bz_test_x_" + str(randi() % 1000)
 	irc1.set_nick(new_nick1)
 	
@@ -165,7 +193,9 @@ func test_009_set_nick():
 	nick1 = new_nick1 # Update state for test_011
 
 func test_010_kick_user():
-	gut.p("Client 1 kicks Client 2 aggressively")
+	if not _require_live():
+		return
+	print_log("Client 1 kicks Client 2 aggressively")
 	var reason = "Testing bounds"
 	irc1.get_client().kick_user(test_channel, nick2, reason)
 	
@@ -179,7 +209,9 @@ func test_010_kick_user():
 		assert_eq(args[2], reason, "Reason explicitly verified matches")
 
 func test_011_channel_part():
-	gut.p("Client 1 executing strict parting procedure")
+	if not _require_live():
+		return
+	print_log("Client 1 executing strict parting procedure")
 	irc1.part_channel(test_channel)
 	await wait_for_signal(irc1.get_client().parted, 10.0)
 	var part1_args = get_signal_parameters(irc1.get_client(), "parted")
